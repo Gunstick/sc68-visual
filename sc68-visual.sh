@@ -68,25 +68,42 @@ function noisetone(n,t) {   # 0 means output is ON, else output is OFF
         gotdata=1
         bytes++
       }
+      env=0
       if (gotdata==1) {
         curtime=strtonum("0x"$2)
         mixer=strtonum("0x"old[8])
         c0=noisetone(and(mixer,8),and(mixer,1))
         c1=noisetone(and(mixer,16),and(mixer,2))
         c2=noisetone(and(mixer,32),and(mixer,4))
-        if(strtonum("0x"old[9])>15){v0="V"}else{v0=substr(old[9],2,1)}
-        if(strtonum("0x"old[10])>15){v1="V"}else{v1=substr(old[10],2,1)}
-        if(strtonum("0x"old[11])>15){v2="V"}else{v2=substr(old[11],2,1)}
-        printf "%s # %6d ",output,curtime-oldtime
-        printf "%3s%s%1s ",substr(old[2],2,1)old[1],c0,v0
-        printf "%3s%s%1s ",substr(old[4],2,1)old[3],c1,v1
-        printf "%3s%s%1s ",substr(old[6],2,1)old[5],c2,v2
-        if(and(compl(mixer),0x38)!=0) {   # only wite noise freq when actually used
-          printf "%2s ",old[7]   
+        if(strtonum("0x"old[9])>15){v0="V";env=1}else{v0=substr(old[9],2,1)}
+        if(strtonum("0x"old[10])>15){v1="V";env=1}else{v1=substr(old[10],2,1)}
+        if(strtonum("0x"old[11])>15){v2="V";env=1}else{v2=substr(old[11],2,1)}
+        printf "%s # %6d,",output,curtime-oldtime
+        if((v0=="0")) {
+          printf "   %s%1s,",c0,v0
         } else {
-          printf "%2s ","--"
+          printf "%3s%s%1s,",substr(old[2],2,1)old[1],c0,v0
         }
-        printf "%4s%c%s ",old[13]old[12],shapewritten,shape["0x"old[14]]
+        if((v1=="0")) {
+          printf "   %s%1s,",c1,v1
+        } else {
+          printf "%3s%s%1s,",substr(old[4],2,1)old[3],c1,v1
+        }
+        if((v2=="0")) {
+          printf "   %s%1s,",c2,v2
+        } else {
+          printf "%3s%s%1s,",substr(old[6],2,1)old[5],c2,v2
+        }
+        if(and(compl(mixer),0x38)!=0) {   # only wite noise freq when actually used
+          printf "%2s,",old[7]   
+        } else {
+          printf "%2s,","--"
+        }
+        if(env==1) { # only write envelope info if actually used
+          printf "%s",old[13]old[12]
+          printf "%c",shapewritten
+          printf "%s",shape["0x"old[14]]
+        }
         printf "\n"
         oldtime=curtime
         outlines++
