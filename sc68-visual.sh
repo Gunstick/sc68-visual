@@ -20,6 +20,7 @@ awk 'BEGIN{
         shape["0x0D"]="/----"  
         shape["0x0E"]="/\\/\\/"  
         shape["0x0F"]="/|___"   
+        mindelta=3000000
       }
 function noisetone(n,t) {   # 0 means output is ON, else output is OFF
   if(n==0) {
@@ -78,7 +79,9 @@ function noisetone(n,t) {   # 0 means output is ON, else output is OFF
         if(strtonum("0x"old[9])>15){v0="V";env=1}else{v0=substr(old[9],2,1)}
         if(strtonum("0x"old[10])>15){v1="V";env=1}else{v1=substr(old[10],2,1)}
         if(strtonum("0x"old[11])>15){v2="V";env=1}else{v2=substr(old[11],2,1)}
-        printf "%s # %6d,",output,curtime-oldtime
+        deltatime=curtime-oldtime
+        printf "%s # %6d,",output,deltatime
+        if((deltatime<mindelta) && (deltatime > 0)){mindelta=deltatime}
         if((v0=="0")) {
           printf "   %s%1s,",c0,v0
         } else {
@@ -111,7 +114,7 @@ function noisetone(n,t) {   # 0 means output is ON, else output is OFF
       output=""
      }
     END {
-      print outlines " lines, with " bytes " bytes. Total: " lines+2*bytes
+      print outlines " lines, with " bytes " bytes. Total: " lines+2*bytes " Smallest delta:" mindelta " " 2000000/mindelta "Hz"
     }'
 #kill $bgjob
 # First colums is the play pass number(when the music sequencer is call), you can ignore that. 
