@@ -3,10 +3,15 @@
 # GPLv3 gunstick@syn2cat.lu 2016
 # ULM rulez!
 # thanks Ben for the awesome player
-exec sc68 --ym-engine=pulse -qqq "$@" &  
-bgjob=$!
-trap "kill $bgjob" 1 2 3
-stdbuf -oL -eL sc68 --ym-engine=dump --ym-clean-dump  -qqq "$@" |
+if [ "$DUMPFAST" = "" ]
+then
+  exec sc68 --ym-engine=pulse -qqq "$@" &
+  bgjob=$!
+  trap "kill $bgjob" 1 2 3
+else
+  f="-c"
+fi
+stdbuf -oL -eL sc68 --ym-engine=dump --ym-clean-dump  -qqq $f "$@" |
 awk 'BEGIN{   
         shape["0x00"]="\\____"  
         shape["0x01"]=shape["0x02"]=shape["0x03"]=shape["0x00"]
