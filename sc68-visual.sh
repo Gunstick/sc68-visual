@@ -4,6 +4,9 @@
 # ULM rulez!
 # thanks Ben for the awesome player
 
+STYLE="scroll"         # classing dump with everything
+STYLE="splitfix"       # top part: vbl, bottom: timers
+#STYLE="splitscroll"    # future (scroll region for vbl)
 #                    
 # 0006E1 00010D2320 ..-..-7C-..-7C-..-..-..-..-..-..-..-..-.. #    639,   .0,17C.A,17C.7,--,
 # patternNR (50/200Hz etc)
@@ -36,17 +39,23 @@ else
   f="-o/dev/null"
 fi
 tput clear
-TimerLocation=27
+TimerLocation=28
+TimerSize=25
+#tput csr 1 25    # scroll region
 stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  |
 awk \
     -v TputEd="$(tput ed)"       \
     -v TputEl="$(tput el)"       \
+    -v TputSc="$(tput sc)"       \
+    -v TputRc="$(tput rc)"       \
     -v TputHome="$(tput home)"   \
     -v TputClear="$(tput clear)" \
+    -v TputCuu1="$(tput cuu1)" \
     -v TputLower="$(tput cup $TimerLocation 0)" \
+    -v maxtimerlines=$TimerSize \
+    -v style="$STYLE" \
     '
      BEGIN{   
-        maxtimerlines=15
         shape["0x00"]="\\____"  
         shape["0x01"]=shape["0x02"]=shape["0x03"]=shape["0x00"]
         shape["0x04"]="/|___"   
@@ -60,6 +69,7 @@ awk \
         shape["0x0E"]="/\\/\\/"  
         shape["0x0F"]="/|___"   
         new[14]=old[14]="0A"   # STNICCC2015 by 505 does not init shape, but seems to be this one
+        VBLlines=25
       }
 function noisetone(n,t) {   # 0 means output is ON, else output is OFF
   if(n==0) {
@@ -79,21 +89,32 @@ function noisetone(n,t) {   # 0 means output is ON, else output is OFF
       {
       dash=""
       gotdata=0
-      if (oldvbl != $1) {
+      if(style!="scroll") {
+      if (oldvbl" " != $1" ") {    # duh, one point where awk is bad.
         printf TputHome
         for(l=0;l<=VBLlines;l++) {
-          print ""
+          printf "%02d\n",l
         }
-        if(VBLlines++>=24) { VBLlines=0; printf TputEd TputHome }
+        printf TputCuu1 TputEl
+        #printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1, output TputEd TputRc
+printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 "   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A        Channel B        Channel C         N  Envelope   Upd" TputRc
+        if(VBLlines++>=24) { 
+           VBLlines=0;
+           #printf TputEd  
+           #printf TputHome 
+        }
         printedlines=0
-        oldvbl=$1
         vbl=1
-      } else {
-        oldvbl=$1
       }
-      if(vbl--==0) {printf TputLower}
-      output=output sprintf("%02d %6s %s ",VBLlines,oldvbl,$2)
+      if(vbl--==0) {printf TputLower ; printf TputEd}
+      }
+      output=""
       oldvbl=$1
+      if(style!="scroll") {
+        output=output sprintf("%02d %6s %s ",VBLlines,oldvbl,$2)
+      } else {
+        output=output sprintf("%6s %s ",oldvbl,$2)
+      }
       split($3,new,"-")
       for(i=1;i<=13;i++)
         {
@@ -107,6 +128,10 @@ function noisetone(n,t) {   # 0 means output is ON, else output is OFF
           }
           if(new[i]!="..")
           {
+            old[i]=new[i]
+          }
+          dash="-"
+        }
       if(new[14]=="..") # no shape register written
       {
         output=output sprintf("%c..",dash)
@@ -130,17 +155,21 @@ function noisetone(n,t) {   # 0 means output is ON, else output is OFF
         if((c0==" ")||(c0=="'\''")||(v0==0)) {f0="  "} else {f0=substr(old[2],2,1)old[1]}
         if((c1==" ")||(c1=="'\''")||(v1==0)) {f1="  "} else {f1=substr(old[4],2,1)old[3]}
         if((c2==" ")||(c2=="'\''")||(v2==0)) {f2="  "} else {f2=substr(old[6],2,1)old[5]}
-        printf "%s # %6d|",output,curtime-oldtime
-        printf "%3s%s%-12s|",f0,c0,v0
-        printf "%3s%s%-12s|",f1,c1,v1
-        printf "%3s%s%-12s| ",f2,c2,v2
+        output=output sprintf (" # %6d|",curtime-oldtime)
+        output=output sprintf ("%3s%s%-12s|",f0,c0,v0)
+        output=output sprintf ("%3s%s%-12s|",f1,c1,v1)
+        output=output sprintf ("%3s%s%-12s| ",f2,c2,v2)
         if(and(compl(mixer),0x38)!=0) {   # only wite noise freq when actually used
-          printf "%2s ",old[7]   
+          output=output sprintf ("%2s ",old[7])
         } else {
-          printf "%2s ","--"
+          output=output sprintf ("%2s ","--")
         }
-        printf "%4s%c%s ",old[13]old[12],shapewritten,shape["0x"old[14]]
-printf "%2d",bytes-obytes
+        output=output sprintf ("%4s%c%s ",old[13]old[12],shapewritten,shape["0x"old[14]])
+        output=output sprintf ("%2d ",bytes-obytes)
+        printf output 
+        if (printedlines==0) {
+          printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1 TputCuu1, output TputEd TputRc
+        }
 obytes=bytes
 #        if(curtime > vbl) {
 #          vbl=curtime+40048
@@ -153,10 +182,14 @@ obytes=bytes
         outlines++
         printedlines++
       } 
-      if(printedlines>maxtimerlines) {
-        printf "XXXXXXXXXXXXXXXXX" 
+      if(style!="scroll") {
+        if(printedlines>=maxtimerlines) {
+          printf "." 
+        }
+      }else {
+        maxtimerlines=printedlines+1
       }
-      output=""
+      #output=""
      }
     END {
       print outlines " lines, with " bytes " bytes. Total: " lines+2*bytes
