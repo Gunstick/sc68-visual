@@ -8,26 +8,28 @@ STYLE="scroll"         # classing dump with everything
 STYLE="splitfix"       # top part: vbl, bottom: timers
 #STYLE="splitscroll"    # future (scroll region for vbl)
 #                    
-# 0006E1 00010D2320 ..-..-7C-..-7C-..-..-..-..-..-..-..-..-.. #    639,   .0,17C.A,17C.7,--,
-# patternNR (50/200Hz etc)
-# |      time in hex
-# |      |          R0+R1 freq channel A
-# |      |          |     R2+R3 freq channel B
-# |      |          |     |     R4+R5 freq channel C
-# |      |          |     |     |     R6 freq nouse
-# |      |          |     |     |     |  R7 mixer
-# |      |          |     |     |     |  |  R8 volA
-# |      |          |     |     |     |  |  |  R9 volB
-# |      |          |     |     |     |  |  |  |  R10 volC
-# |      |          |     |     |     |  |  |  |  |  R11+R12 env freq
-# |      |          |     |     |     |  |  |  |  |  |     R13 env shape 
-# |      |          |     |     |     |  |  |  |  |  |     |     time delta in dez
-# |      |          |     |     |     |  |  |  |  |  |     |     |     channelA
-# |      |          |     |     |     |  |  |  |  |  |     |     |     |     channelB
-# |      |          |     |     |     |  |  |  |  |  |     |     |     |     |    channelC
-# |      |          |     |     |     |  |  |  |  |  |     |     |     |     |    |      noise
-# |      |          |     |     |     |  |  |  |  |  |     |     |     |     |    |      |  envelope
-# 002B94 0006A904F2 ..-..-..-..-..-..-..-..-..-..-..-..-..-08 #   1650,1C3.C,152 V,   .0,--,002A~\|\|\
+#14 001540 000CFDA000 26-02-E0-08-5E-..-04-32-0F-..-..-8E-..-.. #  13310|226!F           |    '\|\|\008E  |   .0           | 04 008E \|\|\ 20 
+#vbl count (only in split output)
+#|  patternNR (50/200Hz etc)
+#|  |      time in hex
+#|  |      |          R0+R1 freq channel A
+#|  |      |          |     R2+R3 freq channel B
+#|  |      |          |     |     R4+R5 freq channel C
+#|  |      |          |     |     |     R6 freq nouse
+#|  |      |          |     |     |     |  R7 mixer
+#|  |      |          |     |     |     |  |  R8 volA
+#|  |      |          |     |     |     |  |  |  R9 volB
+#|  |      |          |     |     |     |  |  |  |  R10 volC
+#|  |      |          |     |     |     |  |  |  |  |  R11+R12 env freq
+#|  |      |          |     |     |     |  |  |  |  |  |     R13 env shape 
+#|  |      |          |     |     |     |  |  |  |  |  |     |     time delta in dez
+#|  |      |          |     |     |     |  |  |  |  |  |     |     |     channelA + env
+#|  |      |          |     |     |     |  |  |  |  |  |     |     |     |                channelB + env
+#|  |      |          |     |     |     |  |  |  |  |  |     |     |     |                |                channelC + env
+#|  |      |          |     |     |     |  |  |  |  |  |     |     |     |                |                |                 noise
+#|  |      |          |     |     |     |  |  |  |  |  |     |     |     |  !=noise+tone  |   '=noise      |  .=tone         |  envelope freq+shape
+#|  |      |          |     |     |     |  |  |  |  |  |     |     |     |  v             |   v  env on    |  v              |  |          irq per vbl
+#14 001540 000CFDA000 26-02-E0-08-5E-..-04-32-0F-..-..-8E-..-.. #  13310|226!F           |    '\|\|\008E  |   .0           | 04 008E \|\|\ 20 
 
 if [ "$DUMPFAST" = "" ]
 then
@@ -39,9 +41,20 @@ else
   f="-o/dev/null"
 fi
 tput clear
-TimerLocation=28
-TimerSize=25
+TimerLocation=28  # which line on the screen timer display should be
+TimerSize=25      # how many timer lines to show
 #tput csr 1 25    # scroll region
+
+# tput options:
+# ed: erase until end of display
+# el: erase until end of line
+# sc: save cursor position
+# rc: restore cursor position
+# home: go to top left
+# clear: erase whole screen
+# cuu1: move cursor up by one
+# cup y x: move cursor to position y x
+# csr a b: set scroll region from line a to line b
 stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  |
 awk \
     -v TputEd="$(tput ed)"       \
