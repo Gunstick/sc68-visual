@@ -143,9 +143,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
 # timertypeN=timertyper(new[N],cN)
 # if(timertypeN!="") {  output=output TputSc TputInfoA timertypeN TputRc }
             timertype=""
-            if((vol!="..")&&(ctrl=="."))   { timertype="SID(pwm)" }
-            if((vol!="..")&&(ctrl==" "))   { timertype="digit/wave" }
-            if(ovol=="10")   { timertype="syncbuzz" }
+            if((vol!="..")&&(ctrl=="."))   { timertype="      SID(pwm)       " }
+            if((vol!="..")&&(ctrl==" "))   { timertype="  digit/short wave   " }
+            if(ovol=="10")                 { timertype="      syncbuzz       " }
   return TputInvertOn timertype TputInvertOff
 }
       {
