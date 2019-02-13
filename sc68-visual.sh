@@ -75,6 +75,7 @@ stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  |
 awk \
     -v TputEd="$(tput ed)"       \
     -v TputEl="$(tput el)"       \
+    -v TputUnderline="$(tput smul)"       \
     -v TputSc="$(tput sc)"       \
     -v TputRc="$(tput rc)"       \
     -v TputHome="$(tput home)"   \
@@ -122,6 +123,11 @@ function freq2note(reg,div) {
   freq=2000000/div/reg
   midinote=12*log(freq/440)/log(2)+69;
   return substr(notes,1+(int(midinote)-12)*4,3)
+}
+function vol_(str,vol) {    # underlines as much letters as there is volume
+  if(vol=="10") { return str}  # enevlope is on
+  vol=strtonum("0x"vol)
+  return substr(str,1,5) TputUnderline substr(str,6,vol) TputNormal substr(str,vol+7,length(str))
 }
 function noisetone(n,t) {   # 0 means output is ON, else output is OFF
   if(n==0) {
@@ -228,10 +234,10 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         if((c2==" ")||(c2=="'\''")||(v2==0)) {f2="  "} else {f2=substr(old[6],2,1)old[5]}
         output=output sprintf (" # %6d|",curtime-oldtime)
         if((o0==f0 c0 v0) && (vbl!=0) ) {
-          output=output "                     |"
+          output=output vol_("                     |",v0)
         } else {
           #output=output sprintf ("%3s%s%-12s|",f0,c0,v0)
-          output=output sprintf ("%3s(%3s)%s%-12s|",f0,freq2note(f0),c0,v0)
+          output=output vol_(sprintf ("%3s(%3s)%s%-12s|",f0,freq2note(f0),c0,v0),v0)
           if(vbl!=0 && timertype0=="") {
             timertype0=timertyper(rold[9],new[9],c0)
             if(timertype0!="") {  output=output TputSc TputInfoA timertype0 TputRc }
@@ -239,9 +245,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } 
         o0=f0 c0 v0
         if((o1==f1 c1 v1) && (vbl!=0) ) {
-          output=output "                     |"
+          output=output vol_("                     |",v1)
         } else {
-          output=output sprintf ("%3s(%3s)%s%-12s|",f1,freq2note(f1),c1,v1)
+          output=output vol_(sprintf ("%3s(%3s)%s%-12s|",f1,freq2note(f1),c1,v1),v1)
           if(vbl!=0 && timertype1=="") {
             timertype1=timertyper(rold[10],new[10],c1)
             if(timertype1!="") {  output=output TputSc TputInfoB timertype1 TputRc }
@@ -249,9 +255,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } 
         o1=f1 c1 v1
         if((o2==f2 c2 v2) && (vbl!=0) ) {
-          output=output "                     |"
+          output=output vol_("                     |",v2)
         } else {
-          output=output sprintf ("%3s(%3s)%s%-12s|",f2,freq2note(f2),c2,v2)
+          output=output vol_(sprintf ("%3s(%3s)%s%-12s|",f2,freq2note(f2),c2,v2),v2)
           if(vbl!=0 && timertype2=="") {
             timertype2=timertyper(rold[11],new[11],c2)
             if(timertype2!="") {  output=output TputSc TputInfoC timertype2 TputRc }
