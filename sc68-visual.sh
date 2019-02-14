@@ -6,7 +6,7 @@
 
 STYLE="scroll"         # classing dump with everything
 STYLE="splitfix"       # top part: vbl, bottom: timers
-#STYLE="splitscroll"    # future (scroll region for vbl)
+STYLE="splitscroll"    # future (scroll region for vbl)
 SHOW="all"             # show output even if no registers have been updated
 #SHOW="updated"         # show only output if at least one register was updated
 #                    
@@ -43,7 +43,12 @@ else
   f="-o/dev/null"
 fi
 cleanup() {
- : 
+  if [ "$STYLE" = "splitscroll" ]
+  then
+    tput csr 0 $(tput lines)
+  fi
+  tput cup $(tput lines) 1
+  echo ""
 }
 if [ "$STYLE" != "scroll" ]
 then
@@ -67,10 +72,16 @@ TimerSize=40      # how many timer lines to show
 # sgr0: normal
 # cup y x: move cursor to position y x
 # csr a b: set scroll region from line a to line b
-header="   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A             Channel B             Channel C              N  Envelope        Upd" 
-a=${header%%Channel A*};TputInfoA=$(tput cup $((TimerLocation-1)) ${#a})
-a=${header%%Channel B*};TputInfoB=$(tput cup $((TimerLocation-1)) ${#a})
-a=${header%%Channel C*};TputInfoC=$(tput cup $((TimerLocation-1)) ${#a})
+header="   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A           Channel B           Channel C            N  Envelope        Upd" 
+if [ "$STYLE" =  "splitscroll" ]
+then
+  p=2
+else
+  p=1
+fi
+a=${header%%Channel A*};TputInfoA=$(tput cup $((TimerLocation-p)) ${#a})
+a=${header%%Channel B*};TputInfoB=$(tput cup $((TimerLocation-p)) ${#a})
+a=${header%%Channel C*};TputInfoC=$(tput cup $((TimerLocation-p)) ${#a})
 stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  |
 awk \
     -v TputEd="$(tput ed)"       \
@@ -78,6 +89,7 @@ awk \
     -v TputUnderline="$(tput smul)"       \
     -v TputSc="$(tput sc)"       \
     -v TputRc="$(tput rc)"       \
+    -v TputCsr="$(tput csr 0 $((TimerLocation-4)) )"       \
     -v TputHome="$(tput home)"   \
     -v TputClear="$(tput clear)" \
     -v TputCuu1="$(tput cuu1)" \
@@ -111,6 +123,9 @@ awk \
         new[14]=old[14]="0A"   # STNICCC2015 by 505 does not init shape, but seems to be this one
         VBLlines=25
 notes ="C-0,C#0,D-0,D#0,E-0,F-0,F#0,G-0,G#0,A-0,A#0,B-0,C-1,C#1,D-1,D#1,E-1,F-1,F#1,G-1,G#1,A-1,A#1,B-1,C-2,C#2,D-2,D#2,E-2,F-2,F#2,G-2,G#2,A-2,A#2,B-2,C-3,C#3,D-3,D#3,E-3,F-3,F#3,G-3,G#3,A-3,A#3,B-3,C-4,C#4,D-4,D#4,E-4,F-4,F#4,G-4,G#4,A-4,A#4,B-4,C-5,C#5,D-5,D#5,E-5,F-5,F#5,G-5,G#5,A-5,A#5,B-5,C-6,C#6,D-6,D#6,E-6,F-6,F#6,G-6,G#6,A-6,A#6,B-6,C-7,C#7,D-7,D#7,E-7,F-7,F#7,G-7,G#7,A-7,A#7,B-7,C-8,C#8,D-8,D#8,E-8,F-8,F#8,G-8,G#8,A-8,A#8,B-8,C-9,C#9,D-9,D#9,E-9,F-9,F#9,G-9,G#9,A-9,A#9,B-9,C-a,C#a,D-a,D#a,E-a,F-a,F#a,G-a,G#a,A-a,A#a,B-a" 
+        if(style=="splitscroll") { 
+          printf TputCsr TputLower
+        }
       }
 function freq2note(reg,div) {
   # http://poi.ribbon.free.fr/tmp/freq2regs.htm
@@ -125,9 +140,9 @@ function freq2note(reg,div) {
   return substr(notes,1+(int(midinote)-12)*4,3)
 }
 function vol_(str,vol) {    # underlines as much letters as there is volume
-  if(vol=="10") { return str}  # enevlope is on
   vol=strtonum("0x"vol)
-  return substr(str,1,5) TputUnderline substr(str,6,vol) TputNormal substr(str,vol+7,length(str))
+  if(vol==0) { return str}  # enevlope is on or silent
+  return substr(str,1,4) TputUnderline substr(str,5,vol) TputNormal substr(str,vol+5,length(str)) 
 }
 function noisetone(n,t) {   # 0 means output is ON, else output is OFF
   if(n==0) {
@@ -149,9 +164,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
 # timertypeN=timertyper(new[N],cN)
 # if(timertypeN!="") {  output=output TputSc TputInfoA timertypeN TputRc }
             timertype=""
-            if((vol!="..")&&(ctrl=="."))   { timertype="      SID(pwm)       " }
-            if((vol!="..")&&(ctrl==" "))   { timertype="  digit/short wave   " }
-            if(ovol=="10")                 { timertype="      syncbuzz       " }
+            if((vol!="..")&&(ctrl=="."))   { timertype="     SID(pwm)      " }
+            if((vol!="..")&&(ctrl==" "))   { timertype=" digit/short wave  " }
+            if(ovol=="10")                 { timertype="     syncbuzz      " }
   return TputInvertOn timertype TputInvertOff
 }
       {
@@ -160,11 +175,14 @@ function timertyper(ovol,vol,ctrl,     timertype) {
       if(style!="scroll") {
         if (oldvbl" " != $1" ") {    # duh, one point where awk is bad.
           timertype0=timertype1=timertype2=""
-          printf TputHome
-          for(l=0;l<=VBLlines;l++) {
-            printf "%02d\n",l
+          if(style=="splitfix") {
+            printf TputHome
+            for(l=0;l<=VBLlines;l++) {
+              printf "%02d\n",l
+            }
+            printf TputCuu1 
+            printf TputEl 
           }
-          printf TputCuu1 TputEl
           #printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1, output TputEd TputRc
           printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header TputRc
           if(VBLlines++>=24) { 
@@ -175,7 +193,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
           printedlines=0
           vbl=1
         }
-        if(vbl--==0) {printf TputLower ; printf TputEd
+        if(vbl--==0) {printf TputLower 
+          if (style=="splitscroll") {printf TputCuu1 } 
+          printf TputEd
         }
       }
       output=""
@@ -234,10 +254,10 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         if((c2==" ")||(c2=="'\''")||(v2==0)) {f2="  "} else {f2=substr(old[6],2,1)old[5]}
         output=output sprintf (" # %6d|",curtime-oldtime)
         if((o0==f0 c0 v0) && (vbl!=0) ) {
-          output=output vol_("                     |",v0)
+          output=output vol_("                   |",v0)
         } else {
           #output=output sprintf ("%3s%s%-12s|",f0,c0,v0)
-          output=output vol_(sprintf ("%3s(%3s)%s%-12s|",f0,freq2note(f0),c0,v0),v0)
+          output=output vol_(sprintf ("%3s-%3s_%1s%-10s|",f0,freq2note(f0),c0,v0),v0)
           if(vbl!=0 && timertype0=="") {
             timertype0=timertyper(rold[9],new[9],c0)
             if(timertype0!="") {  output=output TputSc TputInfoA timertype0 TputRc }
@@ -245,9 +265,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } 
         o0=f0 c0 v0
         if((o1==f1 c1 v1) && (vbl!=0) ) {
-          output=output vol_("                     |",v1)
+          output=output vol_("                   |",v1)
         } else {
-          output=output vol_(sprintf ("%3s(%3s)%s%-12s|",f1,freq2note(f1),c1,v1),v1)
+          output=output vol_(sprintf ("%3s-%3s_%s%-10s|",f1,freq2note(f1),c1,v1),v1)
           if(vbl!=0 && timertype1=="") {
             timertype1=timertyper(rold[10],new[10],c1)
             if(timertype1!="") {  output=output TputSc TputInfoB timertype1 TputRc }
@@ -255,9 +275,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } 
         o1=f1 c1 v1
         if((o2==f2 c2 v2) && (vbl!=0) ) {
-          output=output vol_("                     |",v2)
+          output=output vol_("                   |",v2)
         } else {
-          output=output vol_(sprintf ("%3s(%3s)%s%-12s|",f2,freq2note(f2),c2,v2),v2)
+          output=output vol_(sprintf ("%3s-%3s_%s%-10s|",f2,freq2note(f2),c2,v2),v2)
           if(vbl!=0 && timertype2=="") {
             timertype2=timertyper(rold[11],new[11],c2)
             if(timertype2!="") {  output=output TputSc TputInfoC timertype2 TputRc }
@@ -281,9 +301,15 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         output=output sprintf ("%4s(%3s)%c%s ",old[13]old[12],freq2note(old[13]old[12],div),shapewritten,shape["0x"old[14]])
         output=output sprintf ("%2d ",bytes-obytes)
         output=fade1 output fade2
-        printf output 
+        if (style!="splitscroll") {printf output }
         if (printedlines==0) {
-          printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1 TputCuu1, output TputEd TputRc
+          if(style=="splitscroll") { 
+             printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 TputCuu1 "\n" output TputRc
+          } else {
+             printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1 TputCuu1, output TputEd TputRc
+          }
+        } else {
+          if((style=="sscroll")||(style=="splitscroll")) {printf output "\n"}
         }
         if(style=="scroll") { obytes=bytes 
         } else {
@@ -292,7 +318,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
 #        if(curtime > vbl) {
 #          vbl=curtime+40048
           #printf "\n" curtime " " vbl "\n"
-          printf "\n" TputEl
+          if (style!="splitscroll") {
+            printf "\n" TputEl
+          }
 #        } else {
 #          printf "\r"
 #        }
