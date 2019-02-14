@@ -184,7 +184,7 @@ function timertyper(ovol,vol,ctrl,     timertype) {
             printf TputEl 
           }
           #printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1, output TputEd TputRc
-          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header TputRc
+          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header "\n" TputEl TputRc
           if(VBLlines++>=24) { 
              VBLlines=0;
              #printf TputEd  
