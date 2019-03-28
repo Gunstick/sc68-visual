@@ -36,7 +36,12 @@ SHOW="all"             # show output even if no registers have been updated
 if [ "$DUMPFAST" = "" ]
 then
   #exec sc68 --ym-engine=pulse -qqq "$@" &  
-  exec sc68 -qqq "$@" &  
+  if [ "${1%mp3}" = "$1" ]
+  then
+    exec sc68 -qqq "$@" &  
+  else
+    cvlc "$1" &
+  fi
   bgjob=$!
   trap "kill $bgjob" 1 2 3
 else
@@ -72,7 +77,7 @@ TimerSize=40      # how many timer lines to show
 # sgr0: normal
 # cup y x: move cursor to position y x
 # csr a b: set scroll region from line a to line b
-header="   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A           Channel B           Channel C            N  Envelope        Upd" 
+header="   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A                  Channel B                  Channel C                   N  Envelope        Upd" 
 if [ "$STYLE" =  "splitscroll" ]
 then
   p=2
@@ -82,7 +87,22 @@ fi
 a=${header%%Channel A*};TputInfoA=$(tput cup $((TimerLocation-p)) ${#a})
 a=${header%%Channel B*};TputInfoB=$(tput cup $((TimerLocation-p)) ${#a})
 a=${header%%Channel C*};TputInfoC=$(tput cup $((TimerLocation-p)) ${#a})
-stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  |
+if [ -t 0 ]
+then
+  stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  
+else
+  # read sc68 dump and 'play' it
+  while read vbl rest
+  do
+    if [ "$ovbl" != "$vbl" ]
+    then
+      sleep 0.002   # 50Hz
+      ovbl="$vbl"
+    fi
+    echo "$vbl $rest"
+  done
+  killall sc68
+fi|
 awk \
     -v TputEd="$(tput ed)"       \
     -v TputEl="$(tput el)"       \
@@ -106,21 +126,25 @@ awk \
     -v style="$STYLE" \
     -v show="$SHOW" \
     -v header="$header" \
+    -v filename="$(basename "$1")" \
     '
      BEGIN{   
-        shape["0x00"]="\\____"  
+        shape["0x00"]="◣____"  
         shape["0x01"]=shape["0x02"]=shape["0x03"]=shape["0x00"]
-        shape["0x04"]="/|___"   
+        shape["0x04"]="◢____"   
         shape["0x05"]=shape["0x06"]=shape["0x07"]=shape["0x04"]
-        shape["0x08"]="\\|\\|\\" 
-        shape["0x09"]="\\____"  
-        shape["0x0A"]="\\/\\/\\"
-        shape["0x0B"]="\\|---"   
-        shape["0x0C"]="/|/|/"  
-        shape["0x0D"]="/----"  
-        shape["0x0E"]="/\\/\\/"  
-        shape["0x0F"]="/|___"   
+        shape["0x08"]="◣◣◣◣◣" 
+        shape["0x09"]="◣____"  
+        shape["0x0A"]="◣◢◣◢◣"
+        shape["0x0B"]="◣◼◼◼◼"   
+        shape["0x0C"]="◢◢◢◢◢"  
+        shape["0x0D"]="◢◼◼◼◼"  
+        shape["0x0E"]="◢◣◢◣◢"  
+        shape["0x0F"]="◢___"   
         new[14]=old[14]="0A"   # STNICCC2015 by 505 does not init shape, but seems to be this one
+        UnicodeNoiseTone="▞"
+        UnicodeTone="▖"
+        UnicodeNoise="▝"
         VBLlines=25
 notes ="C-0,C#0,D-0,D#0,E-0,F-0,F#0,G-0,G#0,A-0,A#0,B-0,C-1,C#1,D-1,D#1,E-1,F-1,F#1,G-1,G#1,A-1,A#1,B-1,C-2,C#2,D-2,D#2,E-2,F-2,F#2,G-2,G#2,A-2,A#2,B-2,C-3,C#3,D-3,D#3,E-3,F-3,F#3,G-3,G#3,A-3,A#3,B-3,C-4,C#4,D-4,D#4,E-4,F-4,F#4,G-4,G#4,A-4,A#4,B-4,C-5,C#5,D-5,D#5,E-5,F-5,F#5,G-5,G#5,A-5,A#5,B-5,C-6,C#6,D-6,D#6,E-6,F-6,F#6,G-6,G#6,A-6,A#6,B-6,C-7,C#7,D-7,D#7,E-7,F-7,F#7,G-7,G#7,A-7,A#7,B-7,C-8,C#8,D-8,D#8,E-8,F-8,F#8,G-8,G#8,A-8,A#8,B-8,C-9,C#9,D-9,D#9,E-9,F-9,F#9,G-9,G#9,A-9,A#9,B-9,C-a,C#a,D-a,D#a,E-a,F-a,F#a,G-a,G#a,A-a,A#a,B-a" 
         if(style=="splitscroll") { 
@@ -142,18 +166,18 @@ function freq2note(reg,div) {
 function vol_(str,vol) {    # underlines as much letters as there is volume
   vol=strtonum("0x"vol)
   if(vol==0) { return str}  # enevlope is on or silent
-  return substr(str,1,4) TputUnderline substr(str,5,vol) TputNormal substr(str,vol+5,length(str)) 
+  return substr(str,1,11) TputUnderline substr(str,12,vol) TputNormal substr(str,vol+12,length(str)) 
 }
 function noisetone(n,t) {   # 0 means output is ON, else output is OFF
   if(n==0) {
     if(t==0) {
-      return("!")
+      return(UnicodeNoiseTone)
     } else {
-      return("'\''")
+      return(UnicodeNoise)
     }
   } else {
     if(t==0) {
-      return(".")
+      return(UnicodeTone)
     } else {
       return(" ")
     }
@@ -163,11 +187,23 @@ function timertyper(ovol,vol,ctrl,     timertype) {
 # call if(vbl!=0 && timertypeN=="")
 # timertypeN=timertyper(new[N],cN)
 # if(timertypeN!="") {  output=output TputSc TputInfoA timertypeN TputRc }
-            timertype=""
-            if((vol!="..")&&(ctrl=="."))   { timertype="     SID(pwm)      " }
-            if((vol!="..")&&(ctrl==" "))   { timertype=" digit/short wave  " }
-            if(ovol=="10")                 { timertype="     syncbuzz      " }
-  return TputInvertOn timertype TputInvertOff
+            timertype="? " ovol " " vol
+            if((vol!="..")&&(ctrl==UnicodeTone))   {
+                            if((ovol==0)||(vol==0)) {   # if the volume does not go down to 0, then we have not pure SID style PWM but 3 different levels
+                                  timertype=" SID(pwm)       "
+                            } else {
+                                  timertype=" SID(short wave)"
+                            }
+            }
+            if((vol!="..")&&(ctrl==" "))   { 
+                            if((ovol==0)||(vol==0)) {   # very crude distinction between samples and real PWM (ZID)
+                                  timertype=" pwm       "
+                            } else {
+                                  timertype=" digit/short wave "
+                            }
+            }
+            if(ovol=="10")                 { timertype="    syncbuzz    " }
+  return TputInvertOn "     " timertype "     " TputInvertOff 
 }
       {
       dash=""
@@ -184,7 +220,7 @@ function timertyper(ovol,vol,ctrl,     timertype) {
             printf TputEl 
           }
           #printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1, output TputEd TputRc
-          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header "\n" TputEl TputRc
+          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header "\nPlaying: ▶ " filename TputEd TputRc
           if(VBLlines++>=24) { 
              VBLlines=0;
              #printf TputEd  
@@ -242,22 +278,32 @@ function timertyper(ovol,vol,ctrl,     timertype) {
           fade1=fade2=""
         }
         curtime=strtonum("0x"$2)
+        if((old[14]=="0A") || (old[14]=="0E"))  {   # triangles are half period
+          envdiv=512 
+        } else {
+          if((old[14]=="08") || (old[14]=="0C")) {  # sawtooth
+            envdiv=256
+          } else {
+            envdiv=-1
+          }
+        }
         mixer=strtonum("0x"old[8])
-        c0=noisetone(and(mixer,8),and(mixer,1))
-        c1=noisetone(and(mixer,16),and(mixer,2))
-        c2=noisetone(and(mixer,32),and(mixer,4))
-        if(strtonum("0x"old[9])>15){v0=shapewritten shape["0x"old[14]] old[13]old[12]    }else{v0=substr(old[9],2,1)}
-        if(strtonum("0x"old[10])>15){v1=shapewritten shape["0x"old[14]] old[13]old[12]   }else{v1=substr(old[10],2,1)}
-        if(strtonum("0x"old[11])>15){v2=shapewritten shape["0x"old[14]] old[13]old[12]   }else{v2=substr(old[11],2,1)}
-        if((c0==" ")||(c0=="'\''")||(v0==0)) {f0="  "} else {f0=substr(old[2],2,1)old[1]}
-        if((c1==" ")||(c1=="'\''")||(v1==0)) {f1="  "} else {f1=substr(old[4],2,1)old[3]}
-        if((c2==" ")||(c2=="'\''")||(v2==0)) {f2="  "} else {f2=substr(old[6],2,1)old[5]}
+        c0=noisetone(and(mixer,8),and(mixer,1)) ; if((c0==UnicodeNoise)||(c0==UnicodeNoiseTone)) {n0=old[7]} else {n0="--"}
+        c1=noisetone(and(mixer,16),and(mixer,2)); if((c1==UnicodeNoise)||(c1==UnicodeNoiseTone)) {n1=old[7]} else {n1="--"}
+        c2=noisetone(and(mixer,32),and(mixer,4)); if((c2==UnicodeNoise)||(c2==UnicodeNoiseTone)) {n2=old[7]} else {n2="--"}
+        if(strtonum("0x"old[9])>15) {v0=shapewritten shape["0x"old[14]] old[13]old[12] "(" freq2note(old[13]old[12],envdiv) ")"  }else{v0=substr(old[9],2,1)}
+        if(strtonum("0x"old[10])>15){v1=shapewritten shape["0x"old[14]] old[13]old[12] "(" freq2note(old[13]old[12],envdiv) ")"  }else{v1=substr(old[10],2,1)}
+        if(strtonum("0x"old[11])>15){v2=shapewritten shape["0x"old[14]] old[13]old[12] "(" freq2note(old[13]old[12],envdiv) ")"  }else{v2=substr(old[11],2,1)}
+        if((c0==" ")||(c0==UnicodeNoise)||(v0==0)) {f0="  "} else {f0=substr(old[2],2,1)old[1]}
+        if((c1==" ")||(c1==UnicodeNoise)||(v1==0)) {f1="  "} else {f1=substr(old[4],2,1)old[3]}
+        if((c2==" ")||(c2==UnicodeNoise)||(v2==0)) {f2="  "} else {f2=substr(old[6],2,1)old[5]}
         output=output sprintf (" # %6d|",curtime-oldtime)
         if((o0==f0 c0 v0) && (vbl!=0) ) {
-          output=output vol_("                   |",v0)
+          #output=output vol_("                   |",v0)
+          output=output "                          |"
         } else {
           #output=output sprintf ("%3s%s%-12s|",f0,c0,v0)
-          output=output vol_(sprintf ("%3s-%3s_%1s%-10s|",f0,freq2note(f0),c0,v0),v0)
+          output=output vol_(sprintf ("%3s(%3s)%2s%1s%-15s|",f0,freq2note(f0),n0,c0,v0),v0)
           if(vbl!=0 && timertype0=="") {
             timertype0=timertyper(rold[9],new[9],c0)
             if(timertype0!="") {  output=output TputSc TputInfoA timertype0 TputRc }
@@ -265,9 +311,10 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } 
         o0=f0 c0 v0
         if((o1==f1 c1 v1) && (vbl!=0) ) {
-          output=output vol_("                   |",v1)
+          #output=output vol_("                   |",v1)
+          output=output "                          |"
         } else {
-          output=output vol_(sprintf ("%3s-%3s_%s%-10s|",f1,freq2note(f1),c1,v1),v1)
+          output=output vol_(sprintf ("%3s(%3s)%2s%1s%-15s|",f1,freq2note(f1),n1,c1,v1),v1)
           if(vbl!=0 && timertype1=="") {
             timertype1=timertyper(rold[10],new[10],c1)
             if(timertype1!="") {  output=output TputSc TputInfoB timertype1 TputRc }
@@ -275,9 +322,10 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } 
         o1=f1 c1 v1
         if((o2==f2 c2 v2) && (vbl!=0) ) {
-          output=output vol_("                   |",v2)
+          #output=output vol_("                   |",v2)
+          output=output "                          |"
         } else {
-          output=output vol_(sprintf ("%3s-%3s_%s%-10s|",f2,freq2note(f2),c2,v2),v2)
+          output=output vol_(sprintf ("%3s(%3s)%2s%1s%-15s|",f2,freq2note(f2),n2,c2,v2),v2)
           if(vbl!=0 && timertype2=="") {
             timertype2=timertyper(rold[11],new[11],c2)
             if(timertype2!="") {  output=output TputSc TputInfoC timertype2 TputRc }
@@ -289,19 +337,10 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         } else {
           output=output sprintf (" %2s ","--")
         }
-        if((old[14]=="0A") || (old[14]=="0E"))  {   # triangles are half period
-          div=512 
-        } else {
-          if((old[14]=="08") || (old[14]=="0C")) {  # sawtooth
-            div=256
-          } else {
-            div=-1
-          }
-        }
-        output=output sprintf ("%4s(%3s)%c%s ",old[13]old[12],freq2note(old[13]old[12],div),shapewritten,shape["0x"old[14]])
+        output=output sprintf ("%4s(%3s)%c%s ",old[13]old[12],freq2note(old[13]old[12],envdiv),shapewritten,shape["0x"old[14]])
         output=output sprintf ("%2d ",bytes-obytes)
         output=fade1 output fade2
-        if (style!="splitscroll") {printf output }
+         if (style!="splitscroll") {printf output }
         if (printedlines==0) {
           if(style=="splitscroll") { 
              printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 TputCuu1 "\n" output TputRc
@@ -338,7 +377,12 @@ function timertyper(ovol,vol,ctrl,     timertype) {
       #output=""
      }
     END {
-      print "\n" outlines " lines, with " bytes " bytes. Total: " lines+2*bytes
+      # shortest no fuzz format:  each line takes 2 bytes for the delay (max 65535) and 2 bytes per register
+      # something like this: 0xwwww 0x0r 0xbb 0x0r 0xbb 0x1r 0xbb
+      # wwww is the wait time in nops (equals ym cycles as ym is 2MHz and 68k is 8Mhz)
+      # r is the register number, if the top nibble is non-zero, then read next line
+      # bb is the register value
+      print "\n" outlines " lines, with " bytes " bytes. Total: " 2*outlines+2*bytes
     }'
 #kill $bgjob
 # First colums is the play pass number(when the music sequencer is call), you can ignore that. 
