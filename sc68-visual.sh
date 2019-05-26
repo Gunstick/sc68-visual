@@ -4,11 +4,17 @@
 # ULM rulez!
 # thanks Ben for the awesome player
 
+if [ "$STYLE" = "" ]
+then
 STYLE="scroll"         # classing dump with everything
 STYLE="splitfix"       # top part: vbl, bottom: timers
 STYLE="splitscroll"    # future (scroll region for vbl)
+fi
+if [ "$SHOW" = "" ]
+then
 SHOW="all"             # show output even if no registers have been updated
 #SHOW="updated"         # show only output if at least one register was updated
+fi
 #                    
 #14 001540 000CFDA000 26-02-E0-08-5E-..-04-32-0F-..-..-8E-..-.. #  13310|226!F           |    '\|\|\008E  |   .0           | 04 008E \|\|\ 20 
 #vbl count (only in split output)
@@ -90,6 +96,11 @@ a=${header%%Channel C*};TputInfoC=$(tput cup $((TimerLocation-p)) ${#a})
 if [ -t 0 ]
 then
   stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  
+  ret=$?
+  if [ $ret -ne 0 ]
+  then
+    echo "Error $ret" >&2
+  fi
 else
   # read sc68 dump and 'play' it
   while read vbl rest
@@ -127,12 +138,12 @@ awk \
     -v show="$SHOW" \
     -v header="$header" \
     -v filename="$(basename "$1")" \
+    -v unicode=0 \
     '
      BEGIN{   
+        if (unicode == 1 ) {
         shape["0x00"]="◣____"  
-        shape["0x01"]=shape["0x02"]=shape["0x03"]=shape["0x00"]
         shape["0x04"]="◢____"   
-        shape["0x05"]=shape["0x06"]=shape["0x07"]=shape["0x04"]
         shape["0x08"]="◣◣◣◣◣" 
         shape["0x09"]="◣____"  
         shape["0x0A"]="◣◢◣◢◣"
@@ -141,10 +152,27 @@ awk \
         shape["0x0D"]="◢◼◼◼◼"  
         shape["0x0E"]="◢◣◢◣◢"  
         shape["0x0F"]="◢___"   
-        new[14]=old[14]="0A"   # STNICCC2015 by 505 does not init shape, but seems to be this one
         UnicodeNoiseTone="▞"
         UnicodeTone="▖"
         UnicodeNoise="▝"
+        }else{
+        shape["0x00"]="\\____"  
+        shape["0x04"]="/____"   
+        shape["0x08"]="\\\\\\\\\\" 
+        shape["0x09"]="\\____"  
+        shape["0x0A"]="\\/\\/\\"
+        shape["0x0B"]="\\|---"   
+        shape["0x0C"]="/////"  
+        shape["0x0D"]="/----"  
+        shape["0x0E"]="/\\/\\/"  
+        shape["0x0F"]="/___"   
+        UnicodeNoiseTone="!"
+        UnicodeTone="."
+        UnicodeNoise="'\''"
+        }
+        shape["0x01"]=shape["0x02"]=shape["0x03"]=shape["0x00"]
+        shape["0x05"]=shape["0x06"]=shape["0x07"]=shape["0x04"]
+        new[14]=old[14]="0A"   # STNICCC2015 by 505 does not init shape, but seems to be this one
         VBLlines=25
 notes ="C-0,C#0,D-0,D#0,E-0,F-0,F#0,G-0,G#0,A-0,A#0,B-0,C-1,C#1,D-1,D#1,E-1,F-1,F#1,G-1,G#1,A-1,A#1,B-1,C-2,C#2,D-2,D#2,E-2,F-2,F#2,G-2,G#2,A-2,A#2,B-2,C-3,C#3,D-3,D#3,E-3,F-3,F#3,G-3,G#3,A-3,A#3,B-3,C-4,C#4,D-4,D#4,E-4,F-4,F#4,G-4,G#4,A-4,A#4,B-4,C-5,C#5,D-5,D#5,E-5,F-5,F#5,G-5,G#5,A-5,A#5,B-5,C-6,C#6,D-6,D#6,E-6,F-6,F#6,G-6,G#6,A-6,A#6,B-6,C-7,C#7,D-7,D#7,E-7,F-7,F#7,G-7,G#7,A-7,A#7,B-7,C-8,C#8,D-8,D#8,E-8,F-8,F#8,G-8,G#8,A-8,A#8,B-8,C-9,C#9,D-9,D#9,E-9,F-9,F#9,G-9,G#9,A-9,A#9,B-9,C-a,C#a,D-a,D#a,E-a,F-a,F#a,G-a,G#a,A-a,A#a,B-a" 
         if(style=="splitscroll") { 
@@ -219,8 +247,9 @@ function timertyper(ovol,vol,ctrl,     timertype) {
             printf TputCuu1 
             printf TputEl 
           }
+          if ($2!=0) {Hz=strtonum("0x"$1)/strtonum("0x"$2)*2003200}
           #printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1, output TputEd TputRc
-          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header "\nPlaying: ▶ " filename TputEd TputRc
+          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header "\nPlaying: ▶ " filename TputEd " vbl:" Hz " Hz "TputRc
           if(VBLlines++>=24) { 
              VBLlines=0;
              #printf TputEd  
