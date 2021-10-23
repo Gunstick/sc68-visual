@@ -8,8 +8,19 @@ if [ "$STYLE" = "" ]
 then
 STYLE="scroll"         # classing dump with everything
 STYLE="splitfix"       # top part: vbl, bottom: timers
-STYLE="splitscroll"    # future (scroll region for vbl)
+STYLE="splitscroll,ascii"    # future (scroll region for vbl)
+STYLE="splitscroll,unicode"
 fi
+if [ "${STYLE%%unicode}" != "$STYLE" ]
+then
+  UNICODE=1
+elif [ "${STYLE%%ascii}" != "$STYLE" ]
+then
+  UNICODE=0
+else
+  UNICODE=1   # default is fancy
+fi
+STYLE="${STYLE%,*}"
 if [ "$SHOW" = "" ]
 then
 SHOW="all"             # show output even if no registers have been updated
@@ -41,10 +52,13 @@ fi
 
 if [ "$DUMPFAST" = "" ]
 then
-  #exec sc68 --ym-engine=pulse -qqq "$@" &  
+#  exec sc68 --ym-engine=pulse -qqq "$@" &  
   if [ "${1%mp3}" = "$1" ]
   then
-    exec sc68 -qqq "$@" &  
+    :
+    exec sc68 -qqq "$@"  & 
+#    ./sndh2oszi.sh "${!#}" 2>/dev/null 1>&2 &
+#    sleep 0.5   # wait for oszi video to play
   else
     cvlc "$1" &
   fi
@@ -83,7 +97,7 @@ TimerSize=40      # how many timer lines to show
 # sgr0: normal
 # cup y x: move cursor to position y x
 # csr a b: set scroll region from line a to line b
-header="   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A                  Channel B                  Channel C                   N  Envelope        Upd" 
+header="   VBL    YMtime     FreqA FreqB FreqC N  Mx VA VB VC FreqE Sh   delta  Channel A                  Channel B                  Channel C                   N  Envelope  Shape Upd" 
 if [ "$STYLE" =  "splitscroll" ]
 then
   p=2
@@ -93,7 +107,8 @@ fi
 a=${header%%Channel A*};TputInfoA=$(tput cup $((TimerLocation-p)) ${#a})
 a=${header%%Channel B*};TputInfoB=$(tput cup $((TimerLocation-p)) ${#a})
 a=${header%%Channel C*};TputInfoC=$(tput cup $((TimerLocation-p)) ${#a})
-if [ -t 0 ]
+filename=" ${@: -1}"  # get last parameter in argv
+if [ -t 0 ]    # test if fd 0 is a terminal
 then
   stdbuf -oL -eL sc68 "$@" --ym-engine=dump --ym-clean-dump  -qqq $f  
   ret=$?
@@ -137,9 +152,10 @@ awk \
     -v style="$STYLE" \
     -v show="$SHOW" \
     -v header="$header" \
-    -v filename="$(basename "$1")" \
-    -v unicode=0 \
+    -v filename="$(basename "$filename" .sndh)" \
+    -v unicode=$UNICODE \
     '
+     # '\''  # to make vi syntax highlighting happy
      BEGIN{   
         if (unicode == 1 ) {
         shape["0x00"]="◣____"  
@@ -169,6 +185,7 @@ awk \
         UnicodeNoiseTone="!"
         UnicodeTone="."
         UnicodeNoise="'\''"
+        # '\'' " # to make vi syntax highlighting happy
         }
         shape["0x01"]=shape["0x02"]=shape["0x03"]=shape["0x00"]
         shape["0x05"]=shape["0x06"]=shape["0x07"]=shape["0x04"]
@@ -218,20 +235,20 @@ function timertyper(ovol,vol,ctrl,     timertype) {
             timertype="? " ovol " " vol
             if((vol!="..")&&(ctrl==UnicodeTone))   {
                             if((ovol==0)||(vol==0)) {   # if the volume does not go down to 0, then we have not pure SID style PWM but 3 different levels
-                                  timertype=" SID(pwm)       "
+                                  timertype=" SID(pwm)         "
                             } else {
-                                  timertype=" SID(short wave)"
+                                  timertype=" SID(short wave)  "
                             }
             }
             if((vol!="..")&&(ctrl==" "))   { 
                             if((ovol==0)||(vol==0)) {   # very crude distinction between samples and real PWM (ZID)
-                                  timertype=" pwm       "
+                                  timertype="     pwm          "
                             } else {
                                   timertype=" digit/short wave "
                             }
             }
-            if(ovol=="10")                 { timertype="    syncbuzz    " }
-  return TputInvertOn "     " timertype "     " TputInvertOff 
+            if(ovol=="10")      { timertype="     syncbuzz     " }
+  return " " TputInvertOn "   " timertype "   " TputInvertOff 
 }
       {
       dash=""
@@ -249,7 +266,8 @@ function timertyper(ovol,vol,ctrl,     timertype) {
           }
           if ($2!=0) {Hz=strtonum("0x"$1)/strtonum("0x"$2)*2003200}
           #printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1, output TputEd TputRc
-          printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header "\nPlaying: ▶ " filename TputEd " vbl:" Hz " Hz "TputRc
+          tt=int(curtime/40048/50)
+          printf "%s\nPlaying: ▶ %s%s vbl: %3d Hz %02d:%02d%s", TputSc TputLower TputCuu1 TputCuu1 TputCuu1 header, filename, TputEd, Hz, int(tt/60),tt%60, tRc
           if(VBLlines++>=24) { 
              VBLlines=0;
              #printf TputEd  
@@ -367,7 +385,7 @@ function timertyper(ovol,vol,ctrl,     timertype) {
           output=output sprintf (" %2s ","--")
         }
         output=output sprintf ("%4s(%3s)%c%s ",old[13]old[12],freq2note(old[13]old[12],envdiv),shapewritten,shape["0x"old[14]])
-        output=output sprintf ("%2d ",bytes-obytes)
+        output=output sprintf (" %2d ",bytes-obytes)
         output=fade1 output fade2
          if (style!="splitscroll") {printf output }
         if (printedlines==0) {
