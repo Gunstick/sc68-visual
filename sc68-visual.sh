@@ -7,6 +7,7 @@
 if [ "$STYLE" = "" ]
 then
 STYLE="scroll"         # classing dump with everything
+STYLE="scroll,noesc"   # don't use fancy formatting (only makes sense with scroll)
 STYLE="splitfix"       # top part: vbl, bottom: timers
 STYLE="splitscroll,ascii"    # future (scroll region for vbl)
 STYLE="splitscroll,unicode"
@@ -20,6 +21,19 @@ then
 else
   UNICODE=1   # default is fancy
 fi
+STYLE="$(echo "$STYLE"|sed 's/unicode//;s/ascii//;s/,,//;s/,$//')"
+if [ "${STYLE%%noesc}" != "$STYLE" ]
+then
+  notput="y"
+else
+  notput=""
+fi
+function mytput() {
+  if [ "$notput" = "" ]
+  then
+     tput "$@"
+  fi
+}
 STYLE="${STYLE%,*}"
 if [ "$SHOW" = "" ]
 then
@@ -70,16 +84,16 @@ fi
 cleanup() {
   if [ "$STYLE" = "splitscroll" ]
   then
-    tput csr 0 $(tput lines)
+    mytput csr 0 $(mytput lines)
   fi
-  tput cup $(tput lines) 1
+  mytput cup $(mytput lines) 1
   echo ""
 }
 if [ "$STYLE" != "scroll" ]
 then
   trap cleanup 1 2 3 
 fi
-tput clear
+mytput clear
 TimerLocation=28  # which line on the screen timer display should be
 TimerSize=40      # how many timer lines to show
 #tput csr 1 25    # scroll region
@@ -104,9 +118,9 @@ then
 else
   p=1
 fi
-a=${header%%Channel A*};TputInfoA=$(tput cup $((TimerLocation-p)) ${#a})
-a=${header%%Channel B*};TputInfoB=$(tput cup $((TimerLocation-p)) ${#a})
-a=${header%%Channel C*};TputInfoC=$(tput cup $((TimerLocation-p)) ${#a})
+a=${header%%Channel A*};TputInfoA=$(mytput cup $((TimerLocation-p)) ${#a})
+a=${header%%Channel B*};TputInfoB=$(mytput cup $((TimerLocation-p)) ${#a})
+a=${header%%Channel C*};TputInfoC=$(mytput cup $((TimerLocation-p)) ${#a})
 filename=" ${@: -1}"  # get last parameter in argv
 if [ -t 0 ]    # test if fd 0 is a terminal
 then
@@ -130,21 +144,21 @@ else
   killall sc68
 fi|
 awk \
-    -v TputEd="$(tput ed)"       \
-    -v TputEl="$(tput el)"       \
-    -v TputUnderline="$(tput smul)"       \
-    -v TputSc="$(tput sc)"       \
-    -v TputRc="$(tput rc)"       \
-    -v TputCsr="$(tput csr 0 $((TimerLocation-4)) )"       \
-    -v TputHome="$(tput home)"   \
-    -v TputClear="$(tput clear)" \
-    -v TputCuu1="$(tput cuu1)" \
-    -v TputDim="$(tput dim)" \
-    -v TputNormal="$(tput sgr0)" \
-    -v TputSettab="$(tput hts)" \
-    -v TputInvertOn="$(tput smso)" \
-    -v TputInvertOff="$(tput rmso)" \
-    -v TputLower="$(tput cup $TimerLocation 0)" \
+    -v TputEd="$(mytput ed)"       \
+    -v TputEl="$(mytput el)"       \
+    -v TputUnderline="$(mytput smul)"       \
+    -v TputSc="$(mytput sc)"       \
+    -v TputRc="$(mytput rc)"       \
+    -v TputCsr="$(mytput csr 0 $((TimerLocation-4)) )"       \
+    -v TputHome="$(mytput home)"   \
+    -v TputClear="$(mytput clear)" \
+    -v TputCuu1="$(mytput cuu1)" \
+    -v TputDim="$(mytput dim)" \
+    -v TputNormal="$(mytput sgr0)" \
+    -v TputSettab="$(mytput hts)" \
+    -v TputInvertOn="$(mytput smso)" \
+    -v TputInvertOff="$(mytput rmso)" \
+    -v TputLower="$(mytput cup $TimerLocation 0)" \
     -v TputInfoA="$TputInfoA" \
     -v TputInfoB="$TputInfoB" \
     -v TputInfoC="$TputInfoC" \
@@ -387,15 +401,15 @@ function timertyper(ovol,vol,ctrl,     timertype) {
         output=output sprintf ("%4s(%3s)%c%s ",old[13]old[12],freq2note(old[13]old[12],envdiv),shapewritten,shape["0x"old[14]])
         output=output sprintf (" %2d ",bytes-obytes)
         output=fade1 output fade2
-         if (style!="splitscroll") {printf output }
-        if (printedlines==0) {
+        if (style!="splitscroll") {printf output }
+        if ((style!="scroll")&&(printedlines==0)) {
           if(style=="splitscroll") { 
              printf TputSc TputLower TputCuu1 TputCuu1 TputCuu1 TputCuu1 "\n" output TputRc
           } else {
              printf "%s\n%s",TputSc TputLower TputCuu1 TputCuu1 TputCuu1, output TputEd TputRc
           }
         } else {
-          if((style=="sscroll")||(style=="splitscroll")) {printf output "\n"}
+          if((style=="splitscroll")) {printf output "\n"}
         }
         if(style=="scroll") { obytes=bytes 
         } else {
