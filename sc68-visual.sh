@@ -1,8 +1,17 @@
-#!/bin/bash -e
+#!/bin/bash 
 # YM register visualizer via sc68 
 # GPLv3 gunstick@syn2cat.lu 2016
 # ULM rulez!
 # thanks Ben for the awesome player
+if [ "$1" = "" ]
+then
+  echo "usage: $0 sndhfile"
+  echo "environament variables:"
+  echo "STYLE=[scroll,noesc,splitscroll,ascii,unicode]" 
+  echo "SHOW=[all,updated]"
+  echo "DUMPFAST=yes"
+  exit
+fi
 d=0
 while read program package
 do
@@ -16,7 +25,7 @@ sc68 https://github.com/b3dgs/sc68
 tput ncurses-bin
 cvlc vlc-bin
 stdbuf coreutils
-gawk /usr/bin/gawk
+gawk gawk
 EOF
 if [ $d -eq 1 ]
 then
@@ -35,7 +44,7 @@ then
 fi
 if [ "$STYLE" = "" ]
 then
-STYLE="scroll"         # classing dump with everything
+STYLE="scroll"         # classic dump with everything
 STYLE="scroll,noesc"   # don't use fancy formatting (only makes sense with scroll)
 STYLE="splitfix"       # top part: vbl, bottom: timers
 STYLE="splitscroll,ascii"    # future (scroll region for vbl)
@@ -305,6 +314,7 @@ function timertyper(ovol,vol,ctrl,     timertype) {
             for(l=0;l<=VBLlines;l++) {
               printf "%02d\n",l
             }
+            printf output    # this is not correct, but better that than outputting nothing. Is aynone still using this mode?
             printf TputCuu1 
             printf TputEl 
           }
