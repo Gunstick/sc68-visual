@@ -94,6 +94,7 @@ then
   trap cleanup 1 2 3 
 fi
 mytput clear
+printf '\033[8;70;180t'    # resize window to 180x70
 TimerLocation=28  # which line on the screen timer display should be
 TimerSize=40      # how many timer lines to show
 #tput csr 1 25    # scroll region
@@ -219,7 +220,7 @@ function freq2note(reg,div) {
   if((reg==0)||(div==-1)) {return "   "}
   if(div==0) {div=16}
   freq=2000000/div/reg
-  midinote=12*log(freq/440)/log(2)+69;
+  midinote=12*log(freq/440)/log(2)+70;
   return substr(notes,1+(int(midinote)-12)*4,3)
 }
 function vol_(str,vol) {    # underlines as much letters as there is volume
