@@ -3,7 +3,36 @@
 # GPLv3 gunstick@syn2cat.lu 2016
 # ULM rulez!
 # thanks Ben for the awesome player
-
+d=0
+while read program package
+do
+  if [ "$(which "$program")" = "" ]
+  then
+    echo "$program not found. Please install $package"
+    d=1
+  fi
+done << EOF
+sc68 https://github.com/b3dgs/sc68
+tput ncurses-bin
+cvlc vlc-bin
+stdbuf coreutils
+gawk /usr/bin/gawk
+EOF
+if [ $d -eq 1 ]
+then
+  exit
+fi
+stty -a > /dev/null    # this seems to set the LINES and COLUMNS veriables in bash.
+if [ $LINES -lt 70 ] || [ $COLUMNS -lt 180 ]
+then
+  printf '\033[8;70;180t'    # resize window to 180x70
+  sleep 1
+  if [ $LINES -lt 70 ] || [ $COLUMNS -lt 180 ]
+  then
+    echo "cannot autoresize, please manually resize window to 180x70"
+    exit
+  fi
+fi
 if [ "$STYLE" = "" ]
 then
 STYLE="scroll"         # classing dump with everything
@@ -94,7 +123,7 @@ then
   trap cleanup 1 2 3 
 fi
 mytput clear
-printf '\033[8;70;180t'    # resize window to 180x70
+
 TimerLocation=28  # which line on the screen timer display should be
 TimerSize=40      # how many timer lines to show
 #tput csr 1 25    # scroll region
@@ -144,7 +173,7 @@ else
   done
   killall sc68
 fi|
-awk \
+gawk \
     -v TputEd="$(mytput ed)"       \
     -v TputEl="$(mytput el)"       \
     -v TputUnderline="$(mytput smul)"       \
