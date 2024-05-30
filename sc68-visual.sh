@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 # YM register visualizer via sc68 
 # GPLv3 gunstick@syn2cat.lu 2016
 # ULM rulez!
